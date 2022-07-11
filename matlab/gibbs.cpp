@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <numeric>
 #include <assert.h>
-#include "mex.h"
 
 using namespace std;
 

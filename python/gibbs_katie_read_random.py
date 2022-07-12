@@ -1,8 +1,7 @@
 import numpy as np
-import random
+import math
 from sklearn.neighbors import NearestNeighbors
-import random
-from scipy.special import binom
+from scipy.special import binom as _binom
 
 class  hidalgo():
 
@@ -132,6 +131,21 @@ class  hidalgo():
 		Z[np.where(pZ<0.8)]=0
 		self.Z=Z
 
+def binom(N, q):
+    ss=1.
+    if q==0: return 1.
+    for q1 in range(q):
+        ss=ss*(N-q1)/(q1+1)
+    return ss
+
+    #return _binom(N,q)
+
+# this has to be a bespoke function, because
+#print(binom(-1,0)) -> 1
+#print(binom(-1,1)) -> -1
+#print(binom(-1,2)) -> 1
+#print(binom(-1,3)) -> -1
+# whereas in scipy.special, returns nan
 
 # partition function Z
 def Zpart(N, N1, zeta, q):
@@ -140,6 +154,7 @@ def Zpart(N, N1, zeta, q):
         s += binom(N1-1,q1) * binom(N-N1,q-q1) * zeta**(q1) * (1-zeta)**(q-q1)
     
     return s
+
 
 #################### scenario ######################
 
@@ -151,7 +166,7 @@ N=5
 d1=1
 d2=3
 
-random.seed(10002)
+np.random.seed(10002)
 X=np.zeros((2*N,6))
 
 for j in range(d1):
@@ -160,7 +175,6 @@ for j in range(d1):
 for j in range(d2):
 	X[N:,j]= np.random.normal(2,1,N)
 
-print(X)
 
 model=hidalgo(K=K)
 Niter,K,fixed_Z,use_Potts,estimate_zeta,q,zeta,sampling_rate,burn_in,r,mu,indicesIn,indicesOut,nbrcount,indicesTrack,a,b,c,f,sampling = model.fit(X)
@@ -199,11 +213,22 @@ print('int replica = ',r,';', sep='')
 print('const int N = ',mu.size,';', sep='')
 
 
+# paste the above into `gibbs_katie_print_random.cpp` and retrive
+# the randomly generated numbers for run as `random_numbers.csv`
+
+import pandas as pd
+random_list = pd.read_csv('python/random_numbers.csv', header=None).values.tolist()[0]
+
 #### INITIALIZE PARAMETERS ###############################
-random.seed(10004)
 
 # params to initialise
-V = NN = d = p = a1 = b1= c1 = np.empty(shape=K)
+V = np.empty(shape=K)
+NN = np.empty(shape=K)
+d = np.empty(shape=K)
+p = np.empty(shape=K)
+a1 = np.empty(shape=K)
+b1= np.empty(shape=K)
+c1 = np.empty(shape=K)
 Z = np.empty(shape=N_, dtype=int)
 f1 = np.empty(shape=2)
 
@@ -220,8 +245,9 @@ for k in range(K):
 pp=(K-1)/K
 
 for i in range(N_):
+    z = random_list.pop(0)
     if fixed_Z==False:
-        z = int(np.floor(random.random()*K))
+        #z = int(np.floor(random.random()*K))
         Z[i]=z
     else:
         Z[i]=0
@@ -244,12 +270,36 @@ for i in range(N_):
         index = Iin[q*i+j]
         if Z[index]==k: N_in +=1
 
+
 f1[0]=f[0]+N_in; 
 f1[1]=f[1]+N*q-N_in
 
 sampling = np.append(sampling, 0)
 sampling = np.append(sampling, 0)
 
+########## check scenario 1 ###########
+
+Z_check = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ]
+V_check = [6.35105, 0, ]
+a1_check = [11.,1.,]
+b1_check = [7.35105, 1, ]
+MU_check = [1.46472, 5.40974, 2.46472, 4.78175, 1.17461, 1.95891, 1.05864, 1.06313, 1.85041, 1.28065, ]
+NN_check = [10, 0, ]
+N_check = 10
+sampling_check = [
+2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0.5, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ]
+N_in_check = 30
+
+
+assert(N_ == N_check)
+assert(N_in == N_in_check)
+assert all(NN == NN_check)
+assert all((math.isclose(n1, n2, abs_tol = 0.0002) for n1, n2 in zip(MU, MU_check)))
+assert all(Z == Z_check)
+assert all((math.isclose(n1, n2, abs_tol = 0.0002) for n1, n2 in zip(V, V_check)))
+assert all(sampling == sampling_check)
+
+#########################################
 
 for it in range(Niter):
 
@@ -259,8 +309,11 @@ for it in range(Niter):
 
         while stop ==False:
 
-            r1 = random.random()*200 # random sample for d[k]
-            r2 = random.random() # random number for accepting
+            #r1 = random.random()*200 # random sample for d[k]
+            #r2 = random.random() # random number for accepting
+
+            r1 = random_list.pop(0)
+            r2 = random_list.pop(0)
 
             rmax = (a1[k]-1)/b1[k]
 
@@ -282,8 +335,11 @@ for it in range(Niter):
 
         while stop ==False:
 
-            r1 = random.random() # random sample for p[k]
-            r2 = random.random() # random number for accepting
+            #r1 = random.random() # random sample for p[k]
+            #r2 = random.random() # random number for accepting
+
+            r1 = random_list.pop(0)
+            r2 = random_list.pop(0)
 
             rmax = (c1[k]-1)/(c1[k]-1+c1[K-1]-1)
             frac = ((r1/rmax)**(c1[k]-1))*(((1-r1)/(1-rmax))**(c1[K-1]-1))
@@ -324,8 +380,11 @@ for it in range(Niter):
                 mx=zeta1
 
         while stop == False:
-            r1 = random.random() # random sample for zeta
-            r2 = random.random() # random number for accepting 
+            #r1 = random.random() # random sample for zeta
+            #r2 = random.random() # random number for accepting
+
+            r1 = random_list.pop(0)
+            r2 = random_list.pop(0)
 
             ZZ = np.empty((K,0))
             for k in range(K):
@@ -392,8 +451,11 @@ for it in range(Niter):
             while_loop_count += 1
             if while_loop_count > 10000: break
 
-            r1 = int(np.floor(random.random()*K))
-            r2 = random.random()
+            #r1 = int(np.floor(random.random()*K))
+            #r2 = random.random()
+
+            r1 = random_list.pop(0)
+            r2 = random_list.pop(0)
 
             if prob[r1] > r2:
                 stop = True
@@ -413,6 +475,7 @@ for it in range(Niter):
 
     #### updating prior on zeta ###############################
 
+    N_in = 0
     for i in range(N_):
         k=Z[i]
 
@@ -425,16 +488,23 @@ for it in range(Niter):
     f1[0]=f[0]+N_in
     f1[1]=f[1]+N_*q-N_in
 
-
     #### likelihood ###############################
-
+    lik0=0
     for i in range(N_):
         lik0=lik0+np.log(p[Z[i]])+np.log(d[Z[i]])-(d[Z[i]]+1)*np.log(MU[i])
-        lik1=lik0+np.log(zeta/(1-zeta))*N_in
+    
+    lik1=lik0+np.log(zeta/(1-zeta))*N_in
 
     for k1 in range(K):
-        lik1=lik1-NN[k1]*np.log(Zpart(N_, NN[k1], zeta, q))
+        lik1=lik1-(NN[k1]*np.log(Zpart(N_, NN[k1], zeta, q)))
 
     if(it%sampling_rate==0 and it>= Niter*burn_in):
+        print(it)
         sampling = np.append(sampling, lik0) 
         sampling = np.append(sampling, lik1)
+
+
+# check all of the sampling==sampling from c++
+# given the deterministic read of random vlaues
+sampling_check = random_list
+assert all((math.isclose(n1, n2, abs_tol = 0.02) for n1, n2 in zip(sampling, sampling_check)))

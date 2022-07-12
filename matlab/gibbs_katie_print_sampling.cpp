@@ -21,15 +21,15 @@ using namespace std;
 ///////////////////////////// BEGIN PASTE /////////////////////////
 int Niter = 10;
 const int K = 2;
-bool fixed_Z = 0;
+bool fixed_Z = 1;
 bool use_Potts = 1;
 bool estimate_zeta = 0;
 int q = 3;
-vector <double> MU = {1.068335869834464, 10.819424433519522, 1.0526123569176606, 1.9360352191066537, 11.819424433519522, 1.0052580038149492, 1.1069328194517447, 1.7670518210100217, 1.3960541155409372, 1.3504059017366636};
-vector<int> Iin = {1, 3, 4, 4, 0, 7, 8, 9, 7, 0, 1, 4, 1, 0, 7, 7, 8, 9, 9, 8, 5, 8, 4, 1, 7, 9, 5, 8, 7, 5};
-vector<int> Iout = {1, 3, 4, 0, 3, 4, 7, 0, 0, 1, 3, 7, 6, 8, 9, 1, 2, 4, 5, 8, 9, 2, 5, 6, 7, 9, 2, 5, 6, 8};
-int Iout_count[] = {3, 4, 0, 1, 4, 3, 0, 6, 5, 4};
-int Iout_track[] = {0, 3, 7, 7, 8, 12, 15, 15, 21, 26};
+vector <double> MU = {1.4647219996062466, 5.409740134317853, 2.4647219996062466, 4.7817501050892925, 1.1746064081642558, 1.9589087445409834, 1.058637057660818, 1.0631338562261194, 1.8504063601074203, 1.2806526635220237};
+vector<int> Iin = {2, 4, 7, 3, 9, 4, 0, 4, 7, 1, 4, 9, 0, 9, 3, 8, 6, 9, 8, 5, 9, 5, 8, 9, 5, 6, 7, 5, 7, 4};
+vector<int> Iout = {2, 4, 3, 0, 1, 4, 0, 1, 2, 3, 9, 6, 7, 8, 9, 5, 8, 0, 2, 8, 9, 5, 6, 7, 1, 3, 4, 5, 6, 7};
+int Iout_count[] = {2, 1, 1, 2, 5, 4, 2, 4, 3, 6};
+int Iout_track[] = {0, 2, 3, 4, 6, 11, 15, 17, 21, 24};
 double a[] = {1.0, 1.0};
 double b[] = {1.0, 1.0};
 double c[] = {1.0, 1.0};
@@ -39,8 +39,10 @@ vector <double> sampling = {2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.
 int sampling_rate = 2;
 int replica = 1;
 const int N = 10;
-
 ///////////////////////////// END PASTE /////////////////////////
+
+// Create and open a text file
+ ofstream MyFile("random_numbers.txt");
 
 // variables declared in function Gibbs_Potts, initialized at zero
 double d[K];
@@ -118,6 +120,7 @@ int main()
     for(int i=0; i<N; i++){
         if(fixed_Z==false) { 
             int z=rand()%K;
+            MyFile << z << ",";
             Z[i]=z;
         }
         else Z[i]=0;
@@ -150,6 +153,7 @@ int main()
         sampling.push_back(0);
         sampling.push_back(0);
     
+	
     cout << "Z = np.array([";
 	for (auto i: Z)
     std::cout << i << ", ";
@@ -198,10 +202,33 @@ int main()
 	cout << "pp = " << pp << endl;
 	cout << "par = K"  << endl;
 
-	cout << "sampling" << endl;
+
+	cout << "sampling_check = [" << endl;
 	for (auto i: sampling)
     std::cout << i << ", ";
-    cout << endl;
+    cout << "]" << endl;
+
+	cout << "Z_check = [" << endl;
+	for (auto i: Z)
+    std::cout << i << ", ";
+    cout << "]" << endl;
+
+	cout << "V_check = [" << endl;
+	for (auto i: V)
+    std::cout << i << ", ";
+    cout << "]" << endl;
+
+	cout << "MU_check = [" << endl;
+	for (auto i: MU)
+    std::cout << i << ", ";
+    cout << "]" << endl;
+
+	cout << "NN_check = [" << endl;
+	for (auto i: NN)
+    std::cout << i << ", ";
+    cout << "]" << endl;
+	
+	cout << "N_check = " << N << endl;
 
 /******************* ITERATIONS **********************************************************************************************************/
 	
@@ -221,14 +248,17 @@ int main()
 			while(stop==false){
 	   
 				double r1 = double(rand())/RAND_MAX*200;
+				MyFile << r1 << ",";
 				double r2 = double(rand())/RAND_MAX;
+				MyFile << r2 << ",";
 
 				double rmax = (a1[k]-1)/b1[k];
 				double frac;
 
 				if(a1[k]-1>0) frac = exp(-b1[k]*(r1-rmax)-(a1[k]-1)*(log(rmax)-log(r1))); 
 				else frac = exp(-b1[k]*r1);
-
+				
+				if(it==0) cout << "frac" << frac << endl;
 
 				if(frac>r2){  
 					stop=true;
@@ -261,7 +291,9 @@ int main()
 			while(stop==false){
 
 				double r1 = double(rand())/RAND_MAX; // random sample for p[k]
+				MyFile << r1 << ",";
 				double r2 = double(rand())/RAND_MAX; // random number for accepting
+				MyFile << r2 << ",";
 	
 				double rmax = (c1[k]-1)/(c1[k]-1+c1[K-1]-1);
 				double frac = pow(r1/rmax,c1[k]-1)*pow((1-r1)/(1-rmax),c1[K-1]-1);
@@ -335,7 +367,9 @@ int main()
 
 
                         double r1 = double(rand())/RAND_MAX; // random sample for zeta
+                        MyFile << r1 << ",";
                         double r2 = double(rand())/RAND_MAX; // random number for accepting
+                        MyFile << r2 << ",";
 
                         double ZZ[K];
                         for(int k=0; k< K; k++) ZZ[k]=Zpart(N, NN[k], r1, q); //changed order, bug
@@ -364,6 +398,8 @@ int main()
 
 		/****** SAMPLING Z *******************************************************************************************************/
 
+
+/*
 		if(it==0){
 		cout << "****" <<endl;
     
@@ -381,7 +417,7 @@ int main()
 		cout << "zeta = " << zeta << endl;
 
 		}
-
+*/
 
 		for(int i=0; i<N; i++){
 
@@ -474,7 +510,9 @@ int main()
 			while(stop==false){
 
 				int r1 = rand()%K; //int between 0 and <K
+				MyFile << r1 << ",";
 				double r2 = double(rand())/RAND_MAX;
+				MyFile << r2 << ",";
 				
 				if(prob[r1] > r2) {
 					stop=true;
@@ -559,7 +597,8 @@ int main()
 
                 for(int k1=0; k1<K; k1++) lik1=lik1-NN[k1]*log(Zpart(N, NN[k1], zeta, q));
 		
-		cout << lik0 << " " << lik1 << endl;
+		cout << "Zpart(N, NN[1], zeta, q)" << Zpart(N, NN[1], zeta, q) << endl;
+		//cout << lik0 << " " << lik1 << endl;
 
 
 	/* save data **********************************************************************************************************/
@@ -570,9 +609,14 @@ int main()
 
 	}
 
-    for (auto i: sampling)
+    for (auto i: sampling){
     std::cout << i << ' ';
+	MyFile << i << ",";
+	}
     cout << endl;
+
+	
+
 
     return 0;
 }

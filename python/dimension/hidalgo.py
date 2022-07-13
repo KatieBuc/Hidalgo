@@ -7,10 +7,51 @@ import sys
 import _gibbs
 
 
+class hidalgo():
+	"""Class to fit parameters of the HidAlgo intrinsic dimension model.
 
-class  hidalgo():
+	explain, reference
 
-	def __init__(self, metric = 'euclidean', K = 2, zeta=0.8, q=3, Niter=10000, Nreplicas=1,burn_in=0.9,a=np.ones(2),b=np.ones(2),c=np.ones(2),f=np.ones(2)):
+	Parameters
+	----------
+	metric : str, or callable, optional, default="euclidean" 
+		directly passed to sklearn KNearestNeighbors,
+		must be str or callable that can be passed to KNearestNeighbors
+		distance used in the nearest neighbors part of the algorithm
+	K : int, optional, default=2
+		number of manifolds used in algorithm
+	zeta : float, optional, defualt=0.8
+		"local homogeneity level" used in the algorithm, see equation ?
+	q : int, optional, default=3
+		number of points for local Z interaction, "local homogeneity range"
+		see equation ?
+	Niter : int, optional, default=10000
+		number of Gibbs sampling iterations
+	burn_in : float, optional, default=0.9
+		percentage of Gibbs sampling iterations discarded, "burn-in fraction"
+	Nreplicas : int, optional, default = 1
+		?
+	a ?
+	b ? 
+	c ? 
+	f ? 
+	"""
+
+
+	def __init__(
+		self,
+		metric = 'euclidean',
+		K = 2,
+		zeta=0.8,
+		q=3,
+		Niter=10000,
+		Nreplicas=1,
+		burn_in=0.9,
+		a=np.ones(2),
+		b=np.ones(2),
+		c=np.ones(2),
+		f=np.ones(2)
+	):
 
 		a=np.ones(K)
 		a=np.ones(K)
@@ -29,7 +70,27 @@ class  hidalgo():
 		self.c=c
 		self.f=f
 
-	def _fit(self,X):
+	def _fit(self, X):
+		"""Gibbs sampling and nearest neighbors part of the algorithm.
+
+		Pure function, does not write to self. Called from `fit`.
+
+		Parameters
+		----------
+		X : 2D np.ndarray of shape (N, dim)
+			data to fit the algorithm to
+
+		Returns
+		-------
+		bestsampling : 2D np.ndarray of shape floor(Niter * burn_in), 2*K + 1
+			posterior sample from d, p, likelihood
+			columns correspond to different quantities and their components
+			rows correspond to different samples fron the posterior
+			cols 0 .. K - 1 = posterior sample of d, see equation ...
+			cols K .. 2*K - 1 = posterior sample of p, see eq
+			cols 2*K .. 2*K + N - 1 = posterior sample of Pi, see eq
+			col 2*K + N = posterior sample of likelihood
+		"""
 
 		q=self.q
 		K=self.K
@@ -45,7 +106,7 @@ class  hidalgo():
 		assert isinstance(X,np.ndarray), "X should be a numpy array"
 		assert len(np.shape(X))==2, "X should be a two-dimensional numpy array"
 
-		N,d = np.shape(X)
+		N, d = np.shape(X)
 
 		if self.metric!='predefined':
 			nbrs = NearestNeighbors(n_neighbors=q+1, algorithm='ball_tree',metric=self.metric).fit(X)
@@ -104,8 +165,37 @@ class  hidalgo():
 		return bestsampling
 
 
-
 	def fit(self, X):
+		"""Runs the Hidalgo algorithm and writes results to self.
+
+		Write to self:
+		self.d_ : 1D np.ndarray of length K
+			posterior mean of d, from posterior sample in _fit
+		self.derr_ : 1D np.ndarray of length K
+			posterior std of d, from posterior sample in _fit
+		self.p_ : 1D np.ndarray of length K
+			posterior mean of p, from posterior sample in _fit
+		self.perr_ : 1D np.ndarray of length K
+			posterior std of p, from posterior sample in _fit
+		self.lik_ : float
+			posterior mean of likelihood, from posterior sample in _fit
+		self.likerr_ : float
+			posterior std of likelihood, from posterior sample in _fit
+		Pi : 2D np.ndarray of shape (K, N)
+			todo fill in
+		Z : 2D np.ndarray of shape (K, N)
+			todo fill in
+
+		Parameters
+		----------
+		X : 2D np.ndarray of shape (N, dim)
+			data to fit the algorithm to
+
+		Returns
+		-------
+		None
+		"""
+
 		N=np.shape(X)[0]
 		sampling=self._fit(X)
 		K=self.K

@@ -2,6 +2,8 @@ import numpy as np
 import math
 from sklearn.neighbors import NearestNeighbors
 import pandas as pd
+
+random_z = pd.read_csv('./random_z.csv', header=None).values.tolist()[0]
 random_list = pd.read_csv('./random_numbers.csv', header=None).values.tolist()[0]
 
 
@@ -35,7 +37,7 @@ class hidalgo():
         Niter=10,
         Nreplicas=1,
         burn_in=0.5,
-        fixed_Z=1,
+        fixed_Z=0,
 		use_Potts=1,
 		estimate_zeta=0,
 		sampling_rate=2,
@@ -68,13 +70,14 @@ class hidalgo():
         self.f=f
 
     def _get_neighbourhood_params(self, X):
-        self.N,_ = np.shape(X)
+        N,_ = np.shape(X)
+        q = self.q
 
-        distances = np.sort(X)[:,:self.q+1]
+        nbrs = NearestNeighbors(n_neighbors=q+1, algorithm='ball_tree',metric=self.metric).fit(X)
+        distances, indicesIn = nbrs.kneighbors(X)
         mu = np.divide(distances[:,2],distances[:,1])
 
-        indicesIn = np.argsort(X)[:,:self.q+1]
-        nbrmat=np.zeros((self.N,self.N))
+        nbrmat=np.zeros((N,N))
         for n in range(self.q):
             nbrmat[indicesIn[:,0],indicesIn[:,n+1]]=1
 
@@ -83,13 +86,13 @@ class hidalgo():
         indicesTrack=np.cumsum(nbrcount)
         indicesTrack=np.append(0,indicesTrack[:-1]).astype(int)
         indicesIn=indicesIn[:,1:]
-        indicesIn=np.reshape(indicesIn,(self.N*self.q,)).astype(int)
+        indicesIn=np.reshape(indicesIn,(N*self.q,)).astype(int)
 
         return (mu,indicesIn,indicesOut,nbrcount,indicesTrack)
 
 
-    def _initialise_params(self, Iin, random_list):
-        
+    def _initialise_params(self, N, MU, Iin):
+
         # params to initialise
         V = np.empty(shape=self.K)
         NN = np.empty(shape=self.K)
@@ -98,23 +101,23 @@ class hidalgo():
         a1 = np.empty(shape=self.K)
         b1= np.empty(shape=self.K)
         c1 = np.empty(shape=self.K)
-        Z = np.empty(shape=self.N, dtype=int)
+        Z = np.empty(shape=N, dtype=int)
         f1 = np.empty(shape=2)
 
         for k in range(self.K):
             V[k]=0 
             NN[k]=0
             d[k]=1
-            sampling = np.append(sampling, d[k])
+            #sampling = np.append(sampling, d[k])
 
         for k in range(self.K):
             p[k]=1./self.K
-            sampling = np.append(sampling, p[k])
+            #sampling = np.append(sampling, p[k])
 
         pp=(self.K-1)/self.K
 
-        for i in range(self.N):
-            z = random_list.pop(0)
+        for i in range(N):
+            z = random_z.pop(0)
             if self.fixed_Z==False:
                 #z = int(np.floor(random.random()*K))
                 Z[i]=z
@@ -123,7 +126,7 @@ class hidalgo():
 
             V[Z[i]]=V[Z[i]]+np.log(MU[i])
             NN[Z[i]]+=1
-            sampling = np.append(sampling, Z[i])
+            #sampling = np.append(sampling, Z[i])
 
         for k in range(self.K):
             a1[k]=self.a[k]+NN[k]
@@ -132,7 +135,7 @@ class hidalgo():
 
         N_in=0
 
-        for i in range(self.N):
+        for i in range(N):
             k=Z[i]
 
             for j in range(self.q):
@@ -141,20 +144,32 @@ class hidalgo():
 
 
         f1[0]=self.f[0]+N_in; 
-        f1[1]=self.f[1]+self.N*self.q-N_in
+        f1[1]=self.f[1]+N*self.q-N_in
 
-        sampling = np.append(sampling, 0)
-        sampling = np.append(sampling, 0)
+        #sampling = np.append(sampling, 0)
+        #sampling = np.append(sampling, 0)
 
-        return (V, NN, d, p, a1, b1, c1, Z, f1, N_in, pp, sampling, random_list)
+        return (V, NN, d, p, a1, b1, c1, Z, f1, N_in, pp)
 
-    def gibbs_sampling(self, MU,Iin,Iout,Iout_count,Iout_track,V, NN, d, p, a1, b1, c1, Z, f1, N_in, pp, sampling):
-        N_ = self.N
+    def gibbs_sampling(self, N_, MU,Iin,Iout,Iout_count,Iout_track,V, NN, d, p, a1, b1, c1, Z, f1, N_in, pp, r):
         
-        for it in range(self.Niter):
+        zeta =self.zeta
+        q = self.q
+        K = self.K
+        Niter = self.Niter
+        sampling_rate = self.sampling_rate
+        burn_in = self.burn_in
+        f = self.f
+        fixed_Z = self.fixed_Z
+        use_Potts = self.use_Potts
+        estimate_zeta = self.estimate_zeta
+
+        sampling = np.empty(shape=0) 
+
+        for it in range(Niter):
 
             #### SAMPLING d ###############################
-            for k in range(self.K):
+            for k in range(K):
                 stop = False
 
                 while stop ==False:
@@ -174,13 +189,13 @@ class hidalgo():
 
                     if (frac>r2):
                         stop=True
-                        if(it%self.sampling_rate==0 and it>= self.Niter*self.burn_in):
+                        if(it%sampling_rate==0 and it>= Niter*burn_in):
                             sampling = np.append(sampling, r1)
                         d[k]=r1
 
 
             #### SAMPLING p ###############################
-            for k in range(self.K-1):
+            for k in range(K-1):
                 stop = False
 
                 while stop ==False:
@@ -200,10 +215,10 @@ class hidalgo():
                         p[K-1]+=p[k]-r1
                         pp-=p[k]-r1
                         p[k]=r1
-                        if(it%self.sampling_rate==0 and it>= self.Niter*self.burn_in):
+                        if(it%sampling_rate==0 and it>= Niter*burn_in):
                             sampling = np.append(sampling, r1)
 
-            if(it%self.sampling_rate==0 and it>= self.Niter*self.burn_in):
+            if(it%sampling_rate==0 and it>= Niter*burn_in):
                 sampling = np.append(sampling, (1-pp))
 
 
@@ -213,12 +228,12 @@ class hidalgo():
             mx=0
             l=0
 
-            if bool(self.use_Potts)==True and bool(self.estimate_zeta)==True:
+            if bool(use_Potts)==True and bool(estimate_zeta)==True:
                 for l in range(10):
                     zeta1=0.5+0.05*l
-                    ZZ = np.empty((self.K,0))
-                    for k in range(self.K):
-                        ZZ =np.append(ZZ, Zpart(N_, NN[k], zeta1, self.q))
+                    ZZ = np.empty((K,0))
+                    for k in range(K):
+                        ZZ =np.append(ZZ, Zpart(N_, NN[k], zeta1, q))
                     h = 0
                     for k in range(K):
                         h=h+NN[k]*np.log(ZZ[k])
@@ -228,19 +243,19 @@ class hidalgo():
                     if(val > maxval):
                         maxval=val # found max val for below frac
                         mx=zeta1
-
-                while stop == False:
+ 
+                while stop == False and bool(use_Potts)==True and bool(estimate_zeta)==True:
                     #r1 = random.random() # random sample for zeta
                     #r2 = random.random() # random number for accepting
 
                     r1 = random_list.pop(0)
                     r2 = random_list.pop(0)
 
-                    ZZ = np.empty((self.K,0))
-                    for k in range(self.K):
-                        ZZ =np.append(ZZ, Zpart(N_, NN[k], r1, self.q))
+                    ZZ = np.empty((K,0))
+                    for k in range(K):
+                        ZZ =np.append(ZZ, Zpart(N_, NN[k], r1, q))
                     h = 0
-                    for k in range(self.K):
+                    for k in range(K):
                         h=h+NN[k]*np.log(ZZ[k])
                     
                     val = (f1[0]-1)*np.log(r1)+(f1[1]-1)*np.log(1-r1)-h
@@ -254,10 +269,10 @@ class hidalgo():
 
             for i in range(N_):
 
-                if self.fixed_Z == True: break
+                if fixed_Z == True: break
 
                 if abs((zeta-1)<1E-5):
-                    if(it%self.sampling_rate==0 and it>= self.Niter*self.burn_in):
+                    if(it%sampling_rate==0 and it>= Niter*burn_in):
                         sampling = np.append(sampling, Z[i])
                         continue
                 
@@ -269,7 +284,7 @@ class hidalgo():
 
                 for k1 in range(K):
                     g = 0
-                    if self.use_Potts == True:
+                    if use_Potts == True:
                         n_in = 0
                         for j in range(q):
                             index = int(Iin[q*i+j])
@@ -279,37 +294,38 @@ class hidalgo():
                             index = int(Iout[Iout_track[i] + j])
                             if index > -1 and Z[index] == k1: m_in = m_in + 1.
 
-                        g = (n_in+m_in)*np.log(zeta/(1-zeta))-np.log(Zpart(N_,NN[k1],zeta,self.q))
-                        g=g+np.log(Zpart(N_,NN[k1]-1,zeta,self.q)/Zpart(N_,NN[k1],zeta,self.q))*(NN[k1]-1)
+                        g = (n_in+m_in)*np.log(zeta/(1-zeta))-np.log(Zpart(N_,NN[k1],zeta,q))
+                        g=g+np.log(Zpart(N_,NN[k1]-1,zeta,q)/Zpart(N_,NN[k1],zeta,q))*(NN[k1]-1)
 
                     if g > gmax: gmax=g
                     gg[k1]=g
 
-                for k1 in range(self.K):
+                for k1 in range(K):
                     gg[k1]=np.exp(gg[k1]-gmax)
 
-                for k1 in range(self.K):
+                for k1 in range(K):
                     prob[k1]=p[k1]*d[k1]*MU[i]**(-(d[k1]+1))*gg[k1]
                     norm+=prob[k1]
 
-                for k1 in range(self.K):
+                for k1 in range(K):
                     prob[k1]=prob[k1]/norm
                 
                 while_loop_count = 0
                 while stop == False:
 
                     while_loop_count += 1
-                    if while_loop_count > 10000: break
+                    #if while_loop_count > 10000: break
 
                     #r1 = int(np.floor(random.random()*K))
                     #r2 = random.random()
 
-                    r1 = random_list.pop(0)
+                    print(it, "r1", r1)
+                    r1 = int(random_list.pop(0))
                     r2 = random_list.pop(0)
 
                     if prob[r1] > r2:
                         stop = True
-                        if(it%self.sampling_rate==0 and it>= self.Niter*self.burn_in):
+                        if(it%sampling_rate==0 and it>= Niter*burn_in):
                             sampling = np.append(sampling, r1)
                         NN[Z[i]]-=1
                         a1[Z[i]]-=1
@@ -329,14 +345,14 @@ class hidalgo():
             for i in range(N_):
                 k=Z[i]
 
-                for j in range(self.q):
-                    index=int(Iin[self.q*i+j])
+                for j in range(q):
+                    index=int(Iin[q*i+j])
 
                     if(Z[index]==k): N_in=N_in+1.0
 
 
-            f1[0]=self.f[0]+N_in
-            f1[1]=self.f[1]+N_*self.q-N_in
+            f1[0]=f[0]+N_in
+            f1[1]=f[1]+N_*q-N_in
 
             #### likelihood ###############################
             lik0=0
@@ -345,20 +361,21 @@ class hidalgo():
             
             lik1=lik0+np.log(zeta/(1-zeta))*N_in
 
-            for k1 in range(self.K):
-                lik1=lik1-(NN[k1]*np.log(Zpart(N_, NN[k1], zeta, self.q)))
+            for k1 in range(K):
+                lik1=lik1-(NN[k1]*np.log(Zpart(N_, NN[k1], zeta, q)))
 
-            if(it%self.sampling_rate==0 and it>= self.Niter*self.burn_in):
-                print(it)
+            if(it%sampling_rate==0 and it>= Niter*burn_in):
                 sampling = np.append(sampling, lik0) 
                 sampling = np.append(sampling, lik1)
         
         return sampling
 
-    def _fit(self, X, random_list):
+    def _fit(self, X):
 
         MU,Iin,Iout,Iout_count,Iout_track = self._get_neighbourhood_params(X)
-        V, NN, d, p, a1, b1, c1, Z, f1, N_in, pp, sampling = self._initialise_params(Iin, random_list)
+        
+        N=np.shape(X)[0]
+        V, NN, d, p, a1, b1, c1, Z, f1, N_in, pp = self._initialise_params(N, MU, Iin)
 
         Nsamp=np.floor((self.Niter-np.ceil(self.burn_in*self.Niter))/self.sampling_rate).astype(int)
         Npar=self.N+2*self.K+2+1*(self.estimate_zeta)
@@ -370,13 +387,14 @@ class hidalgo():
         # samples with best max likelihood
         
         ## todo: parallel
-        for r in range(self.Nreplicas):
-            sampling = self.gibbs_sampling(MU,Iin,Iout,Iout_count,Iout_track,V, NN, d, p, a1, b1, c1, Z, f1, N_in, pp, sampling)
-            sampling=np.reshape(sampling,(Nsamp,Npar))	
-            lik=np.mean(sampling[:,-1],axis=0)
-            if(lik>self.maxlik): 
-                bestsampling=sampling
-            sampling=np.reshape(sampling,(Nsamp*Npar,))	
+        #for r in range(self.Nreplicas):
+        r=1
+        sampling = self.gibbs_sampling(MU,Iin,Iout,Iout_count,Iout_track,V, NN, d, p, a1, b1, c1, Z, f1, N_in, pp, r)
+        sampling=np.reshape(sampling,(Nsamp,Npar))	
+        lik=np.mean(sampling[:,-1],axis=0)
+        if(lik>self.maxlik): 
+            bestsampling=sampling
+        sampling=np.reshape(sampling,(Nsamp*Npar,))	
 
         return bestsampling
 

@@ -1,3 +1,19 @@
+"""This is the version of the full code that reads in randomly generated
+    number from a local csv. 
+    
+    Functions that are unit tested:
+        _get_neighbourhood_params
+        _initialise_params
+        gibbs_sampling
+    Untested functions:
+        _fit
+        fit
+    
+    Questions: 
+        1. how do we handle the deterministic case (reading in random numbers for testing)
+        2. ...
+"""
+
 import numpy as np
 import math
 from sklearn.neighbors import NearestNeighbors
@@ -28,6 +44,50 @@ def Zpart(N, N1, zeta, q):
     
     return s
 class hidalgo():
+    """Class to fit parameters of the HidAlgo intrinsic dimension model.
+
+    explain, reference
+
+    Parameters
+    ----------
+    metric : str, or callable, optional, default="euclidean" 
+        directly passed to sklearn KNearestNeighbors,
+        must be str or callable that can be passed to KNearestNeighbors
+        distance used in the nearest neighbors part of the algorithm
+    K : int, optional, default=2
+        number of manifolds used in algorithm
+    zeta : float, optional, defualt=0.8
+        "local homogeneity level" used in the algorithm, see equation ?
+    q : int, optional, default=3
+        number of points for local Z interaction, "local homogeneity range"
+        see equation ?
+    Niter : int, optional, default=10000
+        number of Gibbs sampling iterations
+    Nreplicas : int, optional, default=1
+        number of random starts to run Gibbs sampling
+    burn_in : float, optional, default=0.9
+        percentage of Gibbs sampling iterations discarded, "burn-in fraction"
+    fixed_Z : bool, optional, default=0 ** False
+        estimate parameters with fixed z (joint posterior approximation via Gibbs)
+        z = (z_1, ..., z_K) is a latent variable introduced, where z_i = k
+        indicates point i belongs to manifold K
+    use_Potts : bool, optional, default=1 ** True
+        if using local interaction between z, see equation (4)
+    estimate_zeta : bool, optional, default=0 ** False
+        update zeta in the sampling
+    sampling_rate: int, optional, default=10 ** currently 2
+        rate at which to save samples for each Niter
+    maxlik=-1.E10 ** 
+        ** I dont think we need this after refactor, used in fit for default overwrite
+    a : np.ArrayLike, optional, default=1.0
+        prior parameters of d 
+    b : np.ArrayLike, optional, default=1.0
+        prior parameters of d 
+    c : np.ArrayLike, optional, default=1.0
+        prior parameters of p
+    f : np.ArrayLike, optional, default=1.0
+        parameters of zeta
+    """
 
     def __init__(self,
         metric = 'euclidean', 
@@ -70,6 +130,25 @@ class hidalgo():
         self.f=f
 
     def _get_neighbourhood_params(self, X):
+        """
+        Parameters
+        ----------
+        X : 
+            input data
+
+        Outputs
+        ----------
+        mu :
+            paramerer in Pereto distribtion estimated by r2/r1
+        indicesIn :
+            ? array of neighbours of point i
+        indicesOut :
+            ? array of points for which i is neighbour
+        nbrcount :
+            ?
+        indicesTrack :
+            ?
+        """
         N,_ = np.shape(X)
         q = self.q
 
@@ -92,6 +171,21 @@ class hidalgo():
 
 
     def _initialise_params(self, N, MU, Iin):
+        """
+        Outputs
+        ----------
+        V : 
+        NN :
+        d : 
+        p : 
+        a1 : 
+        b1 : 
+        c1 : 
+        Z : 
+        f1 : 
+        N_in : 
+        pp :
+        """
 
         # params to initialise
         V = np.empty(shape=self.K)
@@ -400,6 +494,37 @@ class hidalgo():
         return bestsampling
 
     def fit(self, X):
+        """Runs the Hidalgo algorithm and writes results to self.
+
+        Write to self:
+        self.d_ : 1D np.ndarray of length K
+            posterior mean of d, from posterior sample in _fit
+        self.derr_ : 1D np.ndarray of length K
+            posterior std of d, from posterior sample in _fit
+        self.p_ : 1D np.ndarray of length K
+            posterior mean of p, from posterior sample in _fit
+        self.perr_ : 1D np.ndarray of length K
+            posterior std of p, from posterior sample in _fit
+        self.lik_ : float
+            mean of likelihood, from sample in _fit
+        self.likerr_ : float
+            std of likelihood, from sample in _fit
+        Pi : 2D np.ndarray of shape (K, N)
+            probability of posterior of z_i = k, point i can be safely
+            assigned to manifold k if Pi > 0.8
+        Z : 1D np.ndarray of length N
+            ****
+
+        Parameters
+        ----------
+        X : 2D np.ndarray of shape (N, dim)
+            data to fit the algorithm to
+
+        Returns
+        -------
+        None
+        
+        """
         N=np.shape(X)[0]
         
         sampling=self._fit(X)

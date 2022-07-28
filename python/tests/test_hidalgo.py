@@ -117,3 +117,6 @@ def test_gibbs_sampling():
 
 
     assert _isclose(sampling, sampling_check)
+
+
+## also need to test for estimate_zeta = True AND use_Potts = True

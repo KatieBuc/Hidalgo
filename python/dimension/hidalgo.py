@@ -178,13 +178,14 @@ class hidalgo():
 		self.perr_ : 1D np.ndarray of length K
 			posterior std of p, from posterior sample in _fit
 		self.lik_ : float
-			posterior mean of likelihood, from posterior sample in _fit
+			mean of likelihood, from posterior sample in _fit
 		self.likerr_ : float
-			posterior std of likelihood, from posterior sample in _fit
+			std of likelihood, from posterior sample in _fit
 		Pi : 2D np.ndarray of shape (K, N)
-			todo fill in
-		Z : 2D np.ndarray of shape (K, N)
-			todo fill in
+			probability of posterior of z_i = k, point i can be safely
+			assigned to manifold k if Pi > 0.8
+		Z : 1D np.ndarray of length N
+			****
 
 		Parameters
 		----------
